@@ -1,0 +1,41 @@
+{
+  "name": "hive-mind",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Hive Mind MVP monorepo",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run -ws build",
+    "dev": "npm run -ws dev",
+    "test": "npm run -ws test",
+    "lint": "npm run -ws lint",
+    "typecheck": "npm run -ws typecheck",
+    "ci:quality": "npm run typecheck && npm run test && npm run build",
+    "ci:smoke": "SMOKE_INFRA_MODE=ci bash scripts/smoke-e2e-local.sh",
+    "setup:local": "bash scripts/bootstrap-local.sh",
+    "dev:up": "bash scripts/dev-up.sh",
+    "dev:down": "bash scripts/dev-down.sh",
+    "db:migrate": "bash scripts/db-migrate.sh",
+    "db:seed": "bash scripts/db-seed.sh",
+    "smoke:local": "bash scripts/smoke-local.sh",
+    "smoke:signing": "bash scripts/smoke-signing.sh",
+    "smoke:stack:up": "bash scripts/smoke-stack-up.sh",
+    "smoke:stack:down": "bash scripts/smoke-stack-down.sh",
+    "smoke:e2e": "bash scripts/smoke-e2e.sh",
+    "smoke:e2e:local": "bash scripts/smoke-e2e-local.sh",
+    "bootstrap:local": "bash scripts/bootstrap-local.sh",
+    "init:mirror": "bash scripts/init-local-mirror.sh"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

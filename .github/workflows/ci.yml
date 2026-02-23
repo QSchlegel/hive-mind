@@ -1,0 +1,116 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  ecosystem-quality:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run quality baseline
+        run: npm run ci:quality
+
+  smoke-e2e:
+    runs-on: ubuntu-latest
+    needs: ecosystem-quality
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+      ipfs:
+        image: ipfs/kubo:latest
+        ports:
+          - 5001:5001
+
+    env:
+      NODE_ENV: development
+      APP_DOMAIN: hive-mind.club
+      APP_JWT_SECRET: ci-smoke-secret-with-32-plus-characters
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+      SMOKE_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+      IPFS_API_URL: http://127.0.0.1:5001/api/v0
+      SMOKE_IPFS_API_URL: http://127.0.0.1:5001/api/v0
+      PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+      PUBLIC_SUPABASE_ANON_KEY: ci-local-anon-key
+      CHAIN_EVM_ENABLED: "true"
+      CHAIN_CARDANO_ENABLED: "true"
+      CHAIN_BITCOIN_ENABLED: "true"
+      BITCOIN_NETWORK: mainnet
+      VAULT_MIRROR_REPO_URL: ${{ github.workspace }}/.local/vault-mirror.git
+      VAULT_MIRROR_WORKDIR: .local/vault-mirror
+      WORKER_POLL_INTERVAL_MS: "1000"
+      WORKER_MAX_ATTEMPTS: "6"
+      GIT_AUTHOR_NAME: Hive Mind Worker
+      GIT_AUTHOR_EMAIL: worker@hive-mind.club
+      SMOKE_TIMEOUT_SECONDS: "240"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prepare local mirror repo
+        run: npm run init:mirror
+
+      - name: Run end-to-end smoke
+        run: npm run ci:smoke
+
+      - name: Smoke diagnostics
+        if: failure()
+        run: |
+          echo "=== smoke pids ==="
+          cat .local/smoke-pids || true
+          echo "=== process snapshot ==="
+          ps -ef | grep -E "next|tsx|node" | grep -v grep || true
+          echo "=== web log ==="
+          tail -n 200 .local/logs/web.log || true
+          echo "=== worker log ==="
+          tail -n 200 .local/logs/worker.log || true
+
+      - name: Upload smoke logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-logs
+          path: .local/logs
+          if-no-files-found: ignore
+
+      - name: Cleanup smoke stack
+        if: always()
+        run: bash scripts/smoke-stack-down.sh || true

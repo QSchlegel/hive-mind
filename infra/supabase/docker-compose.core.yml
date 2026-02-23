@@ -1,0 +1,86 @@
+# version is obsolete in Compose V2; removed to avoid warnings
+services:
+  sb-db:
+    image: supabase/postgres:15.8.1.060
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+    volumes:
+      - sb_db_data:/var/lib/postgresql/data
+    ports:
+      - "54322:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  sb-auth:
+    image: supabase/gotrue:v2.177.0
+    depends_on:
+      sb-db:
+        condition: service_healthy
+    environment:
+      GOTRUE_DB_DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@sb-db:5432/postgres
+      GOTRUE_SITE_URL: ${SITE_URL}
+      GOTRUE_JWT_SECRET: ${JWT_SECRET}
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: 9999
+
+  sb-rest:
+    image: postgrest/postgrest:v12.2.12
+    depends_on:
+      sb-db:
+        condition: service_healthy
+    environment:
+      PGRST_DB_URI: postgres://postgres:${POSTGRES_PASSWORD}@sb-db:5432/postgres
+      PGRST_DB_SCHEMAS: public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+
+  sb-realtime:
+    image: supabase/realtime:v2.34.47
+    depends_on:
+      sb-db:
+        condition: service_healthy
+    environment:
+      DB_HOST: sb-db
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_NAME: postgres
+      DB_SSL: "false"
+      SECRET_KEY_BASE: ${REALTIME_SECRET_KEY_BASE}
+      API_JWT_SECRET: ${JWT_SECRET}
+      ERL_AFLAGS: -proto_dist inet_tcp
+
+  sb-kong:
+    image: kong:2.8.1
+    depends_on:
+      - sb-auth
+      - sb-rest
+      - sb-realtime
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /var/lib/kong/kong.yml
+      KONG_DNS_ORDER: LAST,A,CNAME
+      KONG_PLUGINS: request-transformer,cors,key-auth,acl,basic-auth
+    volumes:
+      - ./kong/kong.yml:/var/lib/kong/kong.yml:ro
+    ports:
+      - "54321:8000"
+
+  sb-studio:
+    image: supabase/studio:2025.06.02-sha-8f2993d
+    depends_on:
+      - sb-kong
+    environment:
+      SUPABASE_URL: http://sb-kong:8000
+      SUPABASE_ANON_KEY: ${ANON_KEY}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "54323:3000"
+
+volumes:
+  sb_db_data:

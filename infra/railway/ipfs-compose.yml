@@ -1,0 +1,12 @@
+services:
+  ipfs:
+    image: ipfs/kubo:latest
+    container_name: hive-mind-ipfs
+    ports:
+      - "5001:5001"
+      - "8080:8080"
+    volumes:
+      - ipfs_data:/data/ipfs
+
+volumes:
+  ipfs_data:

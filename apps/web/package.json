@@ -1,0 +1,41 @@
+{
+  "name": "@hive-mind/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "test": "vitest run",
+    "lint": "next lint",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@better-auth/passkey": "^1.4.19",
+    "@hive-mind/config": "0.1.0",
+    "@hive-mind/shared": "0.1.0",
+    "@meshsdk/bitcoin": "1.9.0-beta.98",
+    "@meshsdk/core": "1.9.0-beta.99",
+    "@supabase/supabase-js": "^2.57.4",
+    "@types/three": "^0.183.1",
+    "better-auth": "^1.4.19",
+    "jose": "^6.1.0",
+    "next": "^16.1.6",
+    "nodemailer": "^8.0.1",
+    "pg": "^8.16.3",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "stripe": "^18.4.0",
+    "three": "^0.183.1",
+    "viem": "^2.37.9",
+    "zod": "^4.1.5"
+  },
+  "devDependencies": {
+    "@types/nodemailer": "^7.0.11",
+    "@types/pg": "^8.15.5",
+    "@types/react": "^19.1.12",
+    "@types/react-dom": "^19.1.9",
+    "vitest": "^3.2.4"
+  }
+}
