@@ -1181,7 +1181,7 @@ ${labelLine ? `${labelLine}\n\n` : ""}${expLine}
               >
                 {entry === "callbacks"
                   ? "Webhook / callbacks"
-                  : entry === "wallets" && section === "bots"
+                  : entry === "wallets"
                     ? "Wallets (connect bot)"
                     : entry[0].toUpperCase() + entry.slice(1)}
               </button>

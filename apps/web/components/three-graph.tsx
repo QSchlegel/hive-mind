@@ -910,7 +910,7 @@ export function ThreeGraph() {
 
     // ── Cleanup (dispose all Three.js resources to avoid leaks and GPU issues) ──
     const disposeObject = (obj: THREE.Object3D) => {
-      if ("geometry" in obj && obj.geometry) obj.geometry.dispose();
+      if ("geometry" in obj && obj.geometry) (obj.geometry as THREE.BufferGeometry).dispose();
       if ("material" in obj) {
         const m = obj.material as THREE.Material;
         if (Array.isArray(m)) m.forEach((mat) => mat.dispose());
