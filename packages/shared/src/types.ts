@@ -22,6 +22,44 @@ export type LedgerEntryType =
 
 export type MirrorTarget = "git" | "ipfs";
 
+export type NoteCallbackEvent = "note.created" | "note.edited";
+
+export type CallbackPostboxStatus = "queued" | "processing" | "delivered" | "failed" | "dead_letter";
+
+export interface NoteCallbackEventsConfig {
+  note_created: boolean;
+  note_edited: boolean;
+}
+
+export interface NoteCallbackPayload {
+  source: "hive-mind";
+  event: NoteCallbackEvent;
+  triggered_at: string;
+  bot_id: string;
+  note: {
+    id: string;
+    slug: string;
+    title: string;
+    version: number;
+    content_md: string;
+  };
+  metrics: {
+    changed_chars: number;
+    xp_minted: number;
+    cost_micro_eur: number;
+    social_callbacks: number;
+  };
+}
+
+export interface BotNoteCallbackConfig {
+  id: string;
+  bot_id: string;
+  endpoint_url: string;
+  enabled: boolean;
+  events: NoteCallbackEventsConfig;
+  updated_at: string;
+}
+
 export interface SignatureEnvelope {
   chain: WalletChain;
   wallet_address: string;

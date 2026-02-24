@@ -1,17 +1,27 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { GET as graphGet } from "../../app/api/graph/route";
+import { GET as docsGet } from "../../app/api/docs/route";
+import { GET as docsDownloadGet } from "../../app/api/docs/download/route";
 import { POST as waitlistPost } from "../../app/api/waitlist/route";
 import { POST as redeemInvitePost } from "../../app/api/invites/redeem/route";
 import { TEST_BOT_ID, dbResult, makeJsonRequest } from "./helpers";
 
 const mocks = vi.hoisted(() => ({
   query: vi.fn(),
-  withTransaction: vi.fn()
+  withTransaction: vi.fn(),
+  readDocsDirectory: vi.fn(),
+  createDocsArchive: vi.fn()
 }));
 
 vi.mock("@/lib/db", () => ({
   query: mocks.query,
   withTransaction: mocks.withTransaction
+}));
+
+vi.mock("@/lib/docs-export", () => ({
+  DOCS_EXPORT_ROOT: "hive-mind-docs",
+  readDocsDirectory: mocks.readDocsDirectory,
+  createDocsArchive: mocks.createDocsArchive
 }));
 
 describe("public API routes", () => {
@@ -53,6 +63,109 @@ describe("public API routes", () => {
       const response = await graphGet();
 
       expect(response.status).toBe(500);
+    });
+  });
+
+  describe("GET /api/docs", () => {
+    it("returns a compact docs index by default", async () => {
+      mocks.readDocsDirectory.mockResolvedValueOnce([
+        {
+          path: "hive-mind-docs/wallets/quickstart.md",
+          content: "# Quickstart\n"
+        },
+        {
+          path: "hive-mind-docs/treasury/governance.md",
+          content: "# Governance\n"
+        }
+      ]);
+
+      const response = await docsGet(new Request("https://hive-mind.test/api/docs"));
+      const json = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(json).toEqual({
+        ok: true,
+        root: "hive-mind-docs",
+        count: 2,
+        mode: "index",
+        files: [
+          {
+            path: "hive-mind-docs/wallets/quickstart.md",
+            chars: "# Quickstart\n".length
+          },
+          {
+            path: "hive-mind-docs/treasury/governance.md",
+            chars: "# Governance\n".length
+          }
+        ]
+      });
+    });
+
+    it("returns full docs when include=content", async () => {
+      mocks.readDocsDirectory.mockResolvedValueOnce([
+        {
+          path: "hive-mind-docs/wallets/quickstart.md",
+          content: "# Quickstart\n"
+        }
+      ]);
+
+      const response = await docsGet(new Request("https://hive-mind.test/api/docs?include=content"));
+      const json = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(json).toEqual({
+        ok: true,
+        root: "hive-mind-docs",
+        count: 1,
+        mode: "full",
+        files: [
+          {
+            path: "hive-mind-docs/wallets/quickstart.md",
+            content: "# Quickstart\n"
+          }
+        ]
+      });
+    });
+
+    it("returns 500 when docs can not be read", async () => {
+      mocks.readDocsDirectory.mockRejectedValueOnce(new Error("fs error"));
+
+      const response = await docsGet(new Request("https://hive-mind.test/api/docs"));
+      const json = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(json.error).toBe("Could not read docs directory");
+    });
+  });
+
+  describe("GET /api/docs/download", () => {
+    it("returns a tar.gz attachment", async () => {
+      mocks.createDocsArchive.mockResolvedValueOnce({
+        archive: Buffer.from("archive-bytes"),
+        fileName: "hive-mind-docs-2026-02-24T10-00-00-000Z.tar.gz"
+      });
+
+      const response = await docsDownloadGet();
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get("content-type")).toBe("application/gzip");
+      expect(response.headers.get("content-disposition")).toBe(
+        'attachment; filename="hive-mind-docs-2026-02-24T10-00-00-000Z.tar.gz"'
+      );
+      expect(response.headers.get("cache-control")).toBe("no-store");
+
+      const body = Buffer.from(await response.arrayBuffer()).toString("utf8");
+      expect(body).toBe("archive-bytes");
+    });
+
+    it("returns 500 when archive creation fails", async () => {
+      mocks.createDocsArchive.mockRejectedValueOnce(new Error("tar error"));
+
+      const response = await docsDownloadGet();
+      const json = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(json.error).toBe("Could not create docs archive");
     });
   });
 

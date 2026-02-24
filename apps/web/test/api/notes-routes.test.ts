@@ -21,7 +21,9 @@ const mocks = vi.hoisted(() => ({
   resolveDailyEndorseSpent: vi.fn(),
   verifyAndPersistActionSignature: vi.fn(),
   moderateContent: vi.fn(),
-  requireSession: vi.fn()
+  requireSession: vi.fn(),
+  enqueueNoteCallbackIfConfigured: vi.fn(),
+  processCallbackJobById: vi.fn()
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -46,6 +48,11 @@ vi.mock("@/lib/session", () => ({
   requireSession: mocks.requireSession
 }));
 
+vi.mock("@/lib/note-callbacks", () => ({
+  enqueueNoteCallbackIfConfigured: mocks.enqueueNoteCallbackIfConfigured,
+  processCallbackJobById: mocks.processCallbackJobById
+}));
+
 describe("notes API routes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -61,6 +68,8 @@ describe("notes API routes", () => {
     mocks.resolveDailyEndorseSpent.mockReturnValue(0);
     mocks.verifyAndPersistActionSignature.mockResolvedValue({ actionSignatureId: "sig-1" });
     mocks.moderateContent.mockReturnValue({ approved: true });
+    mocks.enqueueNoteCallbackIfConfigured.mockResolvedValue(null);
+    mocks.processCallbackJobById.mockResolvedValue(false);
   });
 
   describe("POST /api/notes", () => {
@@ -95,6 +104,47 @@ describe("notes API routes", () => {
       expect(json.version).toBe(1);
       expect(json.pricing.costMicroEur).toBeGreaterThan(0);
       expect(mocks.verifyAndPersistActionSignature).toHaveBeenCalledTimes(1);
+      expect(mocks.processCallbackJobById).not.toHaveBeenCalled();
+    });
+
+    it("enqueues callback jobs and attempts immediate delivery when configured", async () => {
+      mocks.enqueueNoteCallbackIfConfigured.mockResolvedValueOnce("callback-job-1");
+
+      const client = {
+        query: vi.fn(async (sql: string) => {
+          if (sql.includes("insert into notes")) {
+            return dbResult([{ id: TEST_NOTE_ID, slug: "test-note" }]);
+          }
+          if (sql.includes("insert into note_versions")) {
+            return dbResult([{ id: "version-1" }]);
+          }
+          return dbResult([], 1);
+        })
+      };
+      mocks.withTransaction.mockImplementationOnce(async (handler: (client: unknown) => Promise<unknown>) =>
+        handler(client)
+      );
+
+      const response = await createNotePost(
+        makeJsonRequest({
+          title: "Callback note",
+          content_md: "Hello callback",
+          signature: makeSignatureEnvelope()
+        })
+      );
+      const json = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(json.ok).toBe(true);
+      expect(mocks.enqueueNoteCallbackIfConfigured).toHaveBeenCalledTimes(1);
+      expect(mocks.enqueueNoteCallbackIfConfigured).toHaveBeenCalledWith(
+        expect.objectContaining({
+          payload: expect.objectContaining({
+            metrics: expect.objectContaining({ social_callbacks: 1 })
+          })
+        })
+      );
+      expect(mocks.processCallbackJobById).toHaveBeenCalledWith("callback-job-1");
     });
 
     it("returns 400 for insufficient credit", async () => {
@@ -145,6 +195,7 @@ describe("notes API routes", () => {
             return dbResult([
               {
                 id: TEST_NOTE_ID,
+                slug: "test-note",
                 author_bot_id: TEST_BOT_ID,
                 title: "Old title",
                 current_content_md: "old content",
@@ -176,6 +227,57 @@ describe("notes API routes", () => {
       expect(json.ok).toBe(true);
       expect(json.note_id).toBe(TEST_NOTE_ID);
       expect(json.version).toBe(3);
+      expect(mocks.processCallbackJobById).not.toHaveBeenCalled();
+    });
+
+    it("does not fail note edits when callback delivery fails", async () => {
+      mocks.enqueueNoteCallbackIfConfigured.mockResolvedValueOnce("callback-job-2");
+      mocks.processCallbackJobById.mockRejectedValueOnce(new Error("callback timeout"));
+
+      const client = {
+        query: vi.fn(async (sql: string) => {
+          if (sql.includes("from notes where id = $1")) {
+            return dbResult([
+              {
+                id: TEST_NOTE_ID,
+                slug: "test-note",
+                author_bot_id: TEST_BOT_ID,
+                title: "Old title",
+                current_content_md: "old content",
+                current_version: 2
+              }
+            ]);
+          }
+          if (sql.includes("insert into note_versions")) {
+            return dbResult([{ id: "version-3" }]);
+          }
+          return dbResult([], 1);
+        })
+      };
+      mocks.withTransaction.mockImplementationOnce(async (handler: (client: unknown) => Promise<unknown>) =>
+        handler(client)
+      );
+
+      const response = await editNotePatch(
+        makeJsonRequest({
+          title: "Updated",
+          content_md: "old content plus more",
+          signature: makeSignatureEnvelope()
+        }),
+        makeRouteParams(TEST_NOTE_ID)
+      );
+      const json = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(json.ok).toBe(true);
+      expect(mocks.enqueueNoteCallbackIfConfigured).toHaveBeenCalledWith(
+        expect.objectContaining({
+          payload: expect.objectContaining({
+            metrics: expect.objectContaining({ social_callbacks: 1 })
+          })
+        })
+      );
+      expect(mocks.processCallbackJobById).toHaveBeenCalledWith("callback-job-2");
     });
 
     it("returns 400 when note is missing", async () => {
@@ -211,6 +313,7 @@ describe("notes API routes", () => {
             return dbResult([
               {
                 id: TEST_NOTE_ID,
+                slug: "test-note",
                 author_bot_id: "44444444-4444-4444-8444-444444444444",
                 title: "Old title",
                 current_content_md: "old content",

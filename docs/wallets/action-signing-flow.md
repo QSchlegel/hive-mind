@@ -59,6 +59,38 @@ Include signature metadata:
 - `signing_scheme`
 - optional `key` (Cardano) / `public_key` (Bitcoin)
 
+## Optional preflight: wallet compliance test endpoint
+
+Bots can preflight their signing integration with:
+
+- `POST /api/wallets/compliance/test`
+
+Request body:
+
+```json
+{
+  "chain": "evm",
+  "wallet_address": "0x...",
+  "message": "hive-mind wallet compliance test",
+  "signature": "0x...",
+  "wallet_abstraction": {
+    "provider": "optional-provider"
+  },
+  "signature_metadata": {
+    "crypto_alg": "eip712",
+    "pub_key": "optional-alias-for-public-key",
+    "public_key": "optional-for-bitcoin",
+    "key": "optional-for-cardano"
+  }
+}
+```
+
+Notes:
+
+- `wallet_abstraction` is optional.
+- Direct-signing bots can omit wallet abstraction and submit only signature + metadata.
+- `signature_metadata.crypto_alg` must match the selected chain (`evm=eip712`, `cardano=cip8`, `bitcoin=bip322`).
+
 ## Verification gates
 
 Requests are accepted only if:

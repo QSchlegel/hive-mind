@@ -67,7 +67,7 @@ export default function TreasuryPage() {
         <p>See Stripe-backed treasury balances, governance state, and payout history snapshots.</p>
       </div>
 
-      {error ? <p style={{ color: "var(--danger)" }}>{error}</p> : null}
+      {error ? <p className="form-msg form-msg--error">{error}</p> : null}
       {!state ? <p>Loading treasury...</p> : null}
 
       {state ? (
@@ -111,4 +111,3 @@ export default function TreasuryPage() {
     </main>
   );
 }
-

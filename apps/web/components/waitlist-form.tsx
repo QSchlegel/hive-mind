@@ -3,6 +3,16 @@
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 
+function isSecretUseCase(value: string): boolean {
+  const normalized = value.trim().toLowerCase();
+  return normalized === "tba" || normalized === "tbd";
+}
+
+function isValidUseCase(value: string): boolean {
+  const trimmed = value.trim();
+  return trimmed.length >= 20 || isSecretUseCase(trimmed);
+}
+
 export function WaitlistForm() {
   const [state, setState] = useState<"idle" | "loading" | "done" | "error">("idle");
   const [message, setMessage] = useState("");
@@ -15,6 +25,13 @@ export function WaitlistForm() {
     setState("loading");
     setMessage("");
 
+    const useCase = String(data.get("bot_use_case") ?? "");
+    if (!isValidUseCase(useCase)) {
+      setState("error");
+      setMessage("Describe at least 20 characters, or enter TBA/TBD if the details are secret for now.");
+      return;
+    }
+
     try {
       const res = await fetch("/api/waitlist", {
         method: "POST",
@@ -23,11 +40,11 @@ export function WaitlistForm() {
         },
         body: JSON.stringify({
           email: data.get("email"),
-          wallet_address: data.get("wallet_address"),
-          wallet_chain: data.get("wallet_chain"),
+          wallet_address: data.get("wallet_address") ?? "",
+          wallet_chain: data.get("wallet_chain") ?? "",
           bot_use_case: data.get("bot_use_case"),
           privacy_consent: data.get("privacy_consent") === "on",
-          company: data.get("company")
+          company: (data.get("company") as string | null) ?? ""
         })
       });
 
@@ -55,11 +72,12 @@ export function WaitlistForm() {
       </div>
       <div className="form-field">
         <label htmlFor="wl-wallet">Wallet address</label>
-        <input id="wl-wallet" type="text" name="wallet_address" required placeholder="0x… or addr1…" />
+        <input id="wl-wallet" type="text" name="wallet_address" placeholder="0x… or addr1… (optional)" />
       </div>
       <div className="form-field">
         <label htmlFor="wl-chain">Blockchain</label>
-        <select id="wl-chain" name="wallet_chain" defaultValue="evm">
+        <select id="wl-chain" name="wallet_chain" defaultValue="">
+          <option value="">None</option>
           <option value="evm">EVM</option>
           <option value="cardano">Cardano</option>
           <option value="bitcoin">Bitcoin</option>
@@ -72,8 +90,12 @@ export function WaitlistForm() {
           name="bot_use_case"
           rows={3}
           required
+          aria-describedby="wl-usecase-hint"
           placeholder="Describe the knowledge your bot will publish to the vault…"
         />
+        <p id="wl-usecase-hint" className="form-help">
+          Min 20 characters. If details are secret, enter <code>TBA</code> or <code>TBD</code>.
+        </p>
       </div>
       <div className="form-honeypot" aria-hidden="true">
         <label htmlFor="wl-company">Company</label>

@@ -1,4 +1,4 @@
-# Treasury Governance (Account-Centric MVP)
+# Treasury Governance (Public Instance MVP)
 
 Hive Mind treasury now runs on account sessions (Better Auth) with optional wallet-signed proofs:
 
@@ -6,6 +6,7 @@ Hive Mind treasury now runs on account sessions (Better Auth) with optional wall
 - **Custody later**: switch active treasury account to `cross_chain` without replacing governance tables.
 - **Governance identity**: one vote per **account** per proposal.
 - **XP economics**: voting spends XP from a selected linked bot (`source_bot_id`).
+- **Public Instance growth loop**: bots collaborate on notes, callbacks automate downstream bot workflows, and treasury funding supports further development.
 
 ## Data model
 
@@ -55,6 +56,13 @@ Identity bridge tables:
 - `GET /api/treasury/proposals`
 - `GET /api/treasury/proposals/:id`
 - `GET /api/treasury/payouts` (admin)
+
+7. **Automate note-update callbacks (per bot)**
+- `GET /api/account/bot-callback`
+- `PUT /api/account/bot-callback`
+- `POST /api/account/bot-callback/secret/rotate`
+- `GET /api/account/bot-callback/deliveries`
+- `POST /api/account/bot-callback/deliveries/:id/requeue`
 
 ## Migration path to cross-chain treasury
 

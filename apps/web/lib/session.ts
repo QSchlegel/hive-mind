@@ -1,4 +1,5 @@
 import { getAuth } from "./better-auth";
+import { verifyBotJwt } from "./bot-jwt";
 import { getEnv } from "./env";
 import { query } from "./db";
 
@@ -51,6 +52,21 @@ function getRequestedBotId(request: Request): string | null {
   const cookies = parseCookieHeader(request.headers.get("cookie"));
   const fromCookie = cookies.get(ACTIVE_BOT_COOKIE);
   return fromCookie ? fromCookie.trim() : null;
+}
+
+function getBearerToken(request: Request): string | null {
+  const authorization = request.headers.get("authorization");
+  if (!authorization) {
+    return null;
+  }
+
+  const match = authorization.match(/^Bearer\s+(.+)$/i);
+  if (!match) {
+    return null;
+  }
+
+  const token = match[1]?.trim();
+  return token || null;
 }
 
 function parseAllowList(value: string | undefined): Set<string> {
@@ -139,7 +155,97 @@ export async function requireLinkedBot(request: Request, sourceBotId?: string): 
 }
 
 export async function requireSession(request: Request): Promise<SessionPayload> {
+  const botToken = getBearerToken(request);
+  if (botToken) {
+    const claims = await verifyBotJwt(botToken);
+    const bot = await query<{
+      id: string;
+      wallet_chain: "evm" | "cardano" | "bitcoin";
+      wallet_address: string;
+      status: "active" | "paused" | "blocked";
+    }>(
+      `select id, wallet_chain, wallet_address, status
+       from bots
+       where id = $1
+       limit 1`,
+      [claims.bot_id]
+    );
+
+    if (!bot.rowCount) {
+      throw new Error("Bot JWT references unknown bot");
+    }
+
+    const row = bot.rows[0];
+    if (row.status !== "active") {
+      throw new Error("Bot is not active");
+    }
+
+    if (
+      row.wallet_chain !== claims.wallet_chain ||
+      row.wallet_address.toLowerCase() !== claims.wallet_address.toLowerCase()
+    ) {
+      throw new Error("Bot JWT wallet claims mismatch");
+    }
+
+    return {
+      accountId: claims.account_id,
+      email: claims.account_email,
+      name: claims.account_name,
+      sessionId: `bot_jwt:${claims.bot_id}`,
+      botId: row.id,
+      walletChain: row.wallet_chain,
+      walletAddress: row.wallet_address
+    };
+  }
+
   return requireLinkedBot(request);
+}
+
+/** Requires a valid BotJwt in the Authorization header. Use for rotation and other bot-only endpoints. */
+export async function requireBotJwt(request: Request): Promise<SessionPayload> {
+  const botToken = getBearerToken(request);
+  if (!botToken) {
+    throw new Error("Missing BotJwt: send Authorization: Bearer <your-bot-jwt>");
+  }
+  const claims = await verifyBotJwt(botToken);
+  const bot = await query<{
+    id: string;
+    wallet_chain: "evm" | "cardano" | "bitcoin";
+    wallet_address: string;
+    status: "active" | "paused" | "blocked";
+  }>(
+    `select id, wallet_chain, wallet_address, status
+     from bots
+     where id = $1
+     limit 1`,
+    [claims.bot_id]
+  );
+
+  if (!bot.rowCount) {
+    throw new Error("Bot JWT references unknown bot");
+  }
+
+  const row = bot.rows[0];
+  if (row.status !== "active") {
+    throw new Error("Bot is not active");
+  }
+
+  if (
+    row.wallet_chain !== claims.wallet_chain ||
+    row.wallet_address.toLowerCase() !== claims.wallet_address.toLowerCase()
+  ) {
+    throw new Error("Bot JWT wallet claims mismatch");
+  }
+
+  return {
+    accountId: claims.account_id,
+    email: claims.account_email,
+    name: claims.account_name,
+    sessionId: `bot_jwt:${claims.bot_id}`,
+    botId: row.id,
+    walletChain: row.wallet_chain,
+    walletAddress: row.wallet_address
+  };
 }
 
 export async function requireAdminTreasuryAccess(request: Request): Promise<AccountSessionPayload> {

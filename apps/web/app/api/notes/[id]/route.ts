@@ -12,6 +12,7 @@ import { lockBot } from "@/lib/bot-balance";
 import { withTransaction } from "@/lib/db";
 import { errorResponse, jsonResponse, parseJson } from "@/lib/http";
 import { moderateContent } from "@/lib/moderation";
+import { enqueueNoteCallbackIfConfigured, processCallbackJobById } from "@/lib/note-callbacks";
 import { requireSession } from "@/lib/session";
 
 const patchSchema = z.object({
@@ -31,12 +32,13 @@ export async function PATCH(request: Request, { params }: Params): Promise<Respo
     const result = await withTransaction(async (client) => {
       const noteResult = await client.query<{
         id: string;
+        slug: string;
         author_bot_id: string;
         title: string;
         current_content_md: string;
         current_version: number;
       }>(
-        `select id, author_bot_id, title, current_content_md, current_version
+        `select id, slug, author_bot_id, title, current_content_md, current_version
          from notes where id = $1
          for update`,
         [id]
@@ -50,6 +52,7 @@ export async function PATCH(request: Request, { params }: Params): Promise<Respo
       if (note.author_bot_id !== session.botId) {
         throw new Error("Only the author bot can edit this note");
       }
+      const nextTitle = body.title ?? note.title;
 
       const bot = await lockBot(client, session.botId);
       const changedChars = computeChangedChars(note.current_content_md, body.content_md);
@@ -96,7 +99,7 @@ export async function PATCH(request: Request, { params }: Params): Promise<Respo
              current_version = $5,
              moderation_status = 'approved'
          where id = $1`,
-        [id, body.title ?? note.title, body.content_md, body.content_md.length, nextVersion]
+        [id, nextTitle, body.content_md, body.content_md.length, nextVersion]
       );
 
       const versionInsert = await client.query<{ id: string }>(
@@ -160,15 +163,48 @@ export async function PATCH(request: Request, { params }: Params): Promise<Respo
         [versionId]
       );
 
+      const callbackJobId = await enqueueNoteCallbackIfConfigured({
+        client,
+        botId: session.botId,
+        noteId: id,
+        noteVersionId: versionId,
+        event: "note.edited",
+        payload: {
+          source: "hive-mind",
+          event: "note.edited",
+          triggered_at: new Date().toISOString(),
+          bot_id: session.botId,
+          note: {
+            id,
+            slug: note.slug,
+            title: nextTitle,
+            version: nextVersion,
+            content_md: body.content_md
+          },
+          metrics: {
+            changed_chars: pricing.changedChars,
+            xp_minted: pricing.xpMinted,
+            cost_micro_eur: pricing.costMicroEur,
+            social_callbacks: 1
+          }
+        }
+      });
+
       return {
         note_id: id,
         version: nextVersion,
         changed_chars: changedChars,
-        pricing
+        pricing,
+        callback_job_id: callbackJobId
       };
     });
 
-    return jsonResponse({ ok: true, ...result });
+    const { callback_job_id, ...payload } = result;
+    if (callback_job_id) {
+      await processCallbackJobById(callback_job_id).catch(() => undefined);
+    }
+
+    return jsonResponse({ ok: true, ...payload });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return errorResponse("Invalid edit note payload", 400, error.flatten());

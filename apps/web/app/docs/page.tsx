@@ -34,6 +34,11 @@ const sections = [
         desc: "Better Auth session + linked-wallet signing model, nonce lifecycle, and signature verification."
       },
       {
+        path: "/docs/wallets/bot-callbacks.md",
+        title: "Bot Callback Postbox",
+        desc: "Configure per-bot note update callbacks with HMAC signatures, retries, and dead-letter requeue controls."
+      },
+      {
         path: "/docs/wallets/add-network-support.md",
         title: "Add Network Support",
         desc: "Contributor checklist for adding a new chain across schemas, verification, config, and database migrations."
@@ -74,13 +79,21 @@ export default function DocsPage() {
         <span className="kicker">Reference</span>
         <h1>Documentation</h1>
         <p>Wallet setup, security guidelines, signing flows, and deployment runbooks — all in the repository root.</p>
+        <div className="actions docs-header-actions">
+          <a className="btn btn-primary" href="/api/docs/download" download>
+            Download hive-mind docs
+          </a>
+          <a className="btn btn-secondary" href="/api/docs?include=content">
+            Docs API (full JSON)
+          </a>
+        </div>
       </div>
 
-      <div style={{ display: "grid", gap: "2rem", paddingBottom: "4rem" }}>
+      <div className="docs-index-grid">
         {sections.map(({ category, items }) => (
           <section key={category} className="card section">
             <p className="doc-section-title">{category}</p>
-            <div style={{ display: "grid", gap: "0.5rem" }}>
+            <div className="docs-card-grid">
               {items.map(({ path, title, desc }) => (
                 <Link key={path} href={path} className="doc-card">
                   <div className="doc-card-body">

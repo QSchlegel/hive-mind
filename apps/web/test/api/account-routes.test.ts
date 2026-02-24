@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { GET as accountMeGet } from "../../app/api/account/me/route";
 import { POST as activeBotPost } from "../../app/api/account/active-bot/route";
+import { POST as createBotJwtPost } from "../../app/api/account/bot-jwt/route";
+import { POST as rotateBotJwtPost } from "../../app/api/account/bot-jwt/rotate/route";
 import { POST as walletLinkChallengePost } from "../../app/api/account/wallets/link/challenge/route";
 import { POST as walletLinkVerifyPost } from "../../app/api/account/wallets/link/verify/route";
 import { TEST_BOT_ID, TEST_NONCE, dbResult, makeJsonRequest } from "./helpers";
@@ -12,11 +14,21 @@ const TEST_ACCOUNT = {
   sessionId: "session-1"
 };
 
+const TEST_LINKED_SESSION = {
+  ...TEST_ACCOUNT,
+  botId: TEST_BOT_ID,
+  walletChain: "evm" as const,
+  walletAddress: "0x1111111111111111111111111111111111111111"
+};
+
 const mocks = vi.hoisted(() => ({
   query: vi.fn(),
   withTransaction: vi.fn(),
   getEnv: vi.fn(),
   requireAccountSession: vi.fn(),
+  requireLinkedBot: vi.fn(),
+  requireBotJwt: vi.fn(),
+  issueBotJwt: vi.fn(),
   insertNonce: vi.fn(),
   lockActiveNonce: vi.fn(),
   markNonceUsed: vi.fn(),
@@ -34,7 +46,13 @@ vi.mock("@/lib/env", () => ({
 
 vi.mock("@/lib/session", () => ({
   requireAccountSession: mocks.requireAccountSession,
+  requireLinkedBot: mocks.requireLinkedBot,
+  requireBotJwt: mocks.requireBotJwt,
   ACTIVE_BOT_COOKIE: "hm_active_bot_id"
+}));
+
+vi.mock("@/lib/bot-jwt", () => ({
+  issueBotJwt: mocks.issueBotJwt
 }));
 
 vi.mock("@/lib/nonces", () => ({
@@ -51,6 +69,11 @@ describe("account API routes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.requireAccountSession.mockResolvedValue(TEST_ACCOUNT);
+    mocks.requireLinkedBot.mockResolvedValue(TEST_LINKED_SESSION);
+    mocks.issueBotJwt.mockResolvedValue({
+      token: "hm.bot.jwt",
+      expiresAt: "2026-01-08T00:00:00.000Z"
+    });
     mocks.getEnv.mockReturnValue({
       NODE_ENV: "test",
       APP_DOMAIN: "hive-mind.club"
@@ -64,6 +87,7 @@ describe("account API routes", () => {
           bot_id: TEST_BOT_ID,
           wallet_chain: "evm",
           wallet_address: "0x1111111111111111111111111111111111111111",
+          display_label: null,
           xp_balance: 1200,
           credit_balance_micro_eur: "450000",
           linked_at: "2026-01-01T00:00:00.000Z"
@@ -99,6 +123,83 @@ describe("account API routes", () => {
     expect(response.status).toBe(200);
     expect(json.ok).toBe(true);
     expect(response.headers.get("set-cookie")).toContain("hm_active_bot_id=");
+  });
+
+  it("POST /api/account/bot-jwt creates a bot token for existing linked bot", async () => {
+    const response = await createBotJwtPost(
+      makeJsonRequest(
+        {
+          bot_id: TEST_BOT_ID,
+          expires_in_hours: 24
+        },
+        {
+          headers: {
+            origin: "https://hive-mind.club"
+          }
+        }
+      )
+    );
+    const json = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(json.ok).toBe(true);
+    expect(json.bot_id).toBe(TEST_BOT_ID);
+    expect(json.bot_jwt).toBe("hm.bot.jwt");
+    expect(mocks.issueBotJwt).toHaveBeenCalledTimes(1);
+  });
+
+  it("POST /api/account/bot-jwt creates new bot and token with label and expiry", async () => {
+    mocks.query.mockResolvedValueOnce(dbResult([{ n: "0" }]));
+    mocks.withTransaction.mockImplementation(async (handler: (client: unknown) => Promise<unknown>) => handler({ query: vi.fn() }));
+
+    const response = await createBotJwtPost(
+      makeJsonRequest(
+        { label: "my-bot", expiry: "1y" },
+        { headers: { origin: "https://hive-mind.club" } }
+      )
+    );
+    const json = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(json.ok).toBe(true);
+    expect(json.bot_id).toBeDefined();
+    expect(json.label).toBe("my-bot");
+    expect(json.bot_jwt).toBe("hm.bot.jwt");
+    expect(json.expires_at).toBeDefined();
+    expect(mocks.requireAccountSession).toHaveBeenCalled();
+    expect(mocks.requireLinkedBot).not.toHaveBeenCalled();
+    expect(mocks.withTransaction).toHaveBeenCalledTimes(1);
+    expect(mocks.issueBotJwt).toHaveBeenCalledTimes(1);
+  });
+
+  it("POST /api/account/bot-jwt/rotate returns new JWT when authenticated with BotJwt", async () => {
+    mocks.requireBotJwt.mockResolvedValue(TEST_LINKED_SESSION);
+
+    const response = await rotateBotJwtPost(
+      new Request("https://hive-mind.test/api/account/bot-jwt/rotate", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: "Bearer existing-bot-jwt"
+        },
+        body: JSON.stringify({ expires_in_hours: 48 })
+      })
+    );
+    const json = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(json.ok).toBe(true);
+    expect(json.bot_id).toBe(TEST_BOT_ID);
+    expect(json.bot_jwt).toBe("hm.bot.jwt");
+    expect(json.expires_at).toBeDefined();
+    expect(mocks.requireBotJwt).toHaveBeenCalledTimes(1);
+    expect(mocks.issueBotJwt).toHaveBeenCalledWith(
+      expect.objectContaining({
+        botId: TEST_BOT_ID,
+        accountId: TEST_ACCOUNT.accountId,
+        expiresInHours: 48
+      })
+    );
   });
 
   it("POST /api/account/wallets/link/challenge creates nonce challenge", async () => {
@@ -159,4 +260,3 @@ describe("account API routes", () => {
     expect(json.error).toBe("Invalid EVM signature");
   });
 });
-

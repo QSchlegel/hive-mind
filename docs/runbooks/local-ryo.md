@@ -33,6 +33,8 @@ For passkey + magic-link auth flows, ensure these are set in `.env`:
 - `SMTP_FROM`
 - optional: `SMTP_USER`, `SMTP_PASS`
 - optional treasury admin gates: `TREASURY_ADMIN_EMAIL_ALLOWLIST`, `TREASURY_ADMIN_WALLET_ALLOWLIST`
+- optional callback secret override (otherwise `APP_JWT_SECRET` is used): `CALLBACK_SECRET_ENCRYPTION_KEY`
+- callback request timeout in ms (default 2500): `CALLBACK_REQUEST_TIMEOUT_MS`
 
 ## Deterministic end-to-end smoke (recommended)
 
@@ -85,7 +87,7 @@ Then open:
 
 - `http://127.0.0.1:3000/auth` for passkey/magic-link auth
 - `http://127.0.0.1:3000/treasury` for public treasury status
-- `http://127.0.0.1:3000/treasury/account` for member proposal/vote/funding flow
+- `http://127.0.0.1:3000/account` for member account controls, proposal/vote flow, and bot analytics
 - `http://127.0.0.1:3000/treasury/admin` for payout operations (allowlisted admins)
 
 ## CI parity checks

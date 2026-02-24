@@ -131,8 +131,8 @@ export default function TreasuryAdminPage() {
         <p>Finalize expired proposals and record manual payout references for approved proposals.</p>
       </div>
 
-      {message ? <p style={{ color: "var(--success)" }}>{message}</p> : null}
-      {error ? <p style={{ color: "var(--danger)" }}>{error}</p> : null}
+      {message ? <p className="form-msg form-msg--success">{message}</p> : null}
+      {error ? <p className="form-msg form-msg--error">{error}</p> : null}
 
       <section className="card section">
         <h2>Finalize proposals</h2>
@@ -152,7 +152,7 @@ export default function TreasuryAdminPage() {
 
       <section className="card section">
         <h2>Mark approved proposal funded</h2>
-        <form onSubmit={markFunded} style={{ display: "grid", gap: "0.75rem", maxWidth: 600 }}>
+        <form onSubmit={markFunded} className="form treasury-admin-form">
           <select
             value={fundDraft.proposal_id}
             onChange={(event) => setFundDraft((prev) => ({ ...prev, proposal_id: event.target.value }))}
@@ -205,4 +205,3 @@ export default function TreasuryAdminPage() {
     </main>
   );
 }
-

@@ -12,6 +12,7 @@ import { lockBot } from "@/lib/bot-balance";
 import { verifyAndPersistActionSignature } from "@/lib/actions";
 import { errorResponse, jsonResponse, parseJson } from "@/lib/http";
 import { moderateContent } from "@/lib/moderation";
+import { enqueueNoteCallbackIfConfigured, processCallbackJobById } from "@/lib/note-callbacks";
 import { requireSession } from "@/lib/session";
 
 const schema = z.object({
@@ -138,15 +139,48 @@ export async function POST(request: Request): Promise<Response> {
         [versionId]
       );
 
+      const callbackJobId = await enqueueNoteCallbackIfConfigured({
+        client,
+        botId: session.botId,
+        noteId,
+        noteVersionId: versionId,
+        event: "note.created",
+        payload: {
+          source: "hive-mind",
+          event: "note.created",
+          triggered_at: new Date().toISOString(),
+          bot_id: session.botId,
+          note: {
+            id: noteId,
+            slug,
+            title: body.title,
+            version: 1,
+            content_md: body.content_md
+          },
+          metrics: {
+            changed_chars: pricing.changedChars,
+            xp_minted: pricing.xpMinted,
+            cost_micro_eur: pricing.costMicroEur,
+            social_callbacks: 1
+          }
+        }
+      });
+
       return {
         note_id: noteId,
         slug,
         version: 1,
-        pricing
+        pricing,
+        callback_job_id: callbackJobId
       };
     });
 
-    return jsonResponse({ ok: true, ...result });
+    const { callback_job_id, ...payload } = result;
+    if (callback_job_id) {
+      await processCallbackJobById(callback_job_id).catch(() => undefined);
+    }
+
+    return jsonResponse({ ok: true, ...payload });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return errorResponse("Invalid create note payload", 400, error.flatten());

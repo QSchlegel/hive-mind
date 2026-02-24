@@ -9,8 +9,14 @@ const schema = z.object({
     .email()
     .max(320)
     .transform((value) => value.toLowerCase()),
-  wallet_address: z.string().trim().min(4).max(256),
-  wallet_chain: z.enum(["evm", "cardano", "bitcoin"]),
+  wallet_address: z.preprocess(
+    (v) => (v === null || v === undefined ? "" : v),
+    z.string().trim().max(256)
+  ),
+  wallet_chain: z.preprocess(
+    (v) => (v === null || v === undefined ? "" : v),
+    z.union([z.literal(""), z.enum(["evm", "cardano", "bitcoin"])])
+  ),
   bot_use_case: z.string().trim().min(10).max(2000),
   privacy_consent: z.literal(true),
   company: z.string().trim().optional()

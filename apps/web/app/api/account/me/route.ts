@@ -31,6 +31,7 @@ export async function GET(request: Request): Promise<Response> {
       bot_id: string;
       wallet_chain: "evm" | "cardano" | "bitcoin";
       wallet_address: string;
+      display_label: string | null;
       xp_balance: number;
       credit_balance_micro_eur: string;
       linked_at: string;
@@ -38,6 +39,7 @@ export async function GET(request: Request): Promise<Response> {
       `select awl.bot_id,
               awl.wallet_chain,
               awl.wallet_address,
+              awl.display_label,
               b.xp_balance::int,
               b.credit_balance_micro_eur::text,
               awl.linked_at::text
@@ -66,6 +68,7 @@ export async function GET(request: Request): Promise<Response> {
         bot_id: row.bot_id,
         wallet_chain: row.wallet_chain,
         wallet_address: row.wallet_address,
+        display_label: row.display_label ?? null,
         xp_balance: row.xp_balance,
         credit_balance_micro_eur: Number(row.credit_balance_micro_eur),
         credit_balance_eur: Number(row.credit_balance_micro_eur) / 1_000_000,

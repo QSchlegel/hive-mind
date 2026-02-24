@@ -19,6 +19,7 @@
     "dev:up": "bash scripts/dev-up.sh",
     "dev:down": "bash scripts/dev-down.sh",
     "db:migrate": "bash scripts/db-migrate.sh",
+    "db:migrate-one": "bash scripts/db-migrate-one.sh",
     "db:seed": "bash scripts/db-seed.sh",
     "smoke:local": "bash scripts/smoke-local.sh",
     "smoke:signing": "bash scripts/smoke-signing.sh",
@@ -37,5 +38,10 @@
   },
   "engines": {
     "node": ">=22"
+  },
+  "dependencies": {
+    "@opentelemetry/exporter-logs-otlp-http": "^0.212.0",
+    "@opentelemetry/sdk-logs": "^0.212.0",
+    "@vercel/otel": "^2.1.1"
   }
 }

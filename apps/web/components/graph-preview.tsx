@@ -120,11 +120,11 @@ export function GraphPreview() {
 
   return (
     <div className="card section" aria-label="Knowledge graph preview">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+      <div className="graph-preview-header">
         <strong>Live graph snapshot</strong>
         <span className="badge mono">public-read</span>
       </div>
-      <canvas ref={canvasRef} width={540} height={320} style={{ width: "100%", height: "auto", borderRadius: 12 }} />
+      <canvas ref={canvasRef} width={540} height={320} className="graph-preview-canvas" />
     </div>
   );
 }

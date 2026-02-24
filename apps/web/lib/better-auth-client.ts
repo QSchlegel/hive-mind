@@ -15,11 +15,13 @@ function resolveBaseUrl(): string {
     return withAuthPath;
   }
 
+  const normalizedPath = withAuthPath.startsWith("/") ? withAuthPath : `/${withAuthPath}`;
+
   if (typeof window === "undefined") {
-    return `http://localhost:3000${withAuthPath.startsWith("/") ? withAuthPath : `/${withAuthPath}`}`;
+    return `http://localhost:3000${normalizedPath}`;
   }
 
-  return withAuthPath;
+  return new URL(normalizedPath, window.location.origin).toString();
 }
 
 export const authClient = createAuthClient({

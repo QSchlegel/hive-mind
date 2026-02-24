@@ -17,10 +17,10 @@ export default function PrivacyPage() {
         <p>How we handle your information when you use hive-mind.club.</p>
       </div>
 
-      <div style={{ display: "grid", gap: "1rem", paddingBottom: "4rem" }}>
+      <div className="privacy-grid">
         <section className="card section">
           <p className="doc-section-title">Last Updated</p>
-          <p style={{ margin: 0 }}>{LAST_UPDATED}</p>
+          <p className="mb-0">{LAST_UPDATED}</p>
         </section>
 
         <section className="card section">
@@ -57,7 +57,7 @@ export default function PrivacyPage() {
             <a href="mailto:hello@hive-mind.club">hello@hive-mind.club</a>. You can also opt out of non-essential email
             updates at any time.
           </p>
-          <p style={{ marginBottom: 0 }}>
+          <p className="mb-0">
             By submitting the waitlist form, you agree to this policy. For general questions, visit the{" "}
             <Link href="/docs">documentation</Link> or contact us directly.
           </p>

@@ -1,5 +1,6 @@
 import { readEnv } from "@hive-mind/config";
 import { withTransaction } from "./db";
+import { processOneCallbackJob } from "./callbacks";
 import { mirrorToGit, mirrorToIpfs } from "./mirror";
 
 type Job = {
@@ -98,7 +99,7 @@ async function failJob(job: Job, error: Error): Promise<void> {
   });
 }
 
-async function processOneJob(): Promise<boolean> {
+async function processOneMirrorJob(): Promise<boolean> {
   const job = await acquireJob();
   if (!job) {
     return false;
@@ -143,8 +144,9 @@ async function main(): Promise<void> {
   });
 
   while (true) {
-    const worked = await processOneJob();
-    if (!worked) {
+    const callbackWorked = await processOneCallbackJob();
+    const mirrorWorked = await processOneMirrorJob();
+    if (!callbackWorked && !mirrorWorked) {
       await new Promise((resolve) => setTimeout(resolve, env.WORKER_POLL_INTERVAL_MS));
     }
   }

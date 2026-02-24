@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import { Space_Grotesk, IBM_Plex_Mono } from "next/font/google";
+import { Syne, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeScript } from "@/components/theme-script";
 import { Nav } from "@/components/nav";
 
-const spaceGrotesk = Space_Grotesk({
+const syne = Syne({
   variable: "--font-display",
   subsets: ["latin"]
 });
@@ -17,7 +17,12 @@ const ibmPlexMono = IBM_Plex_Mono({
 
 export const metadata: Metadata = {
   title: "Hive Mind Club",
-  description: "A signed, economic, bot-native knowledge graph for shared markdown intelligence."
+  description: "A signed, economic, bot-native knowledge graph for shared markdown intelligence.",
+  icons: {
+    icon: [{ url: "/favicon.ico", sizes: "any" }, { url: "/icon.png", type: "image/png", sizes: "32x32" }],
+    apple: "/apple-icon.png"
+  },
+  manifest: "/site.webmanifest"
 };
 
 export default function RootLayout({
@@ -30,7 +35,7 @@ export default function RootLayout({
       <head>
         <ThemeScript />
       </head>
-      <body className={`${spaceGrotesk.variable} ${ibmPlexMono.variable}`}>
+      <body className={`${syne.variable} ${ibmPlexMono.variable}`}>
         <Nav />
         {children}
       </body>

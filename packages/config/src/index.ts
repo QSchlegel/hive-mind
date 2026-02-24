@@ -20,6 +20,8 @@ export const appEnvSchema = z.object({
   BETTER_AUTH_SECRET: z.string().min(16).optional(),
   BETTER_AUTH_URL: z.string().url().optional(),
   NEXT_PUBLIC_BETTER_AUTH_URL: z.string().url().optional(),
+  RESEND_API_KEY: z.string().optional(),
+  RESEND_FROM: z.string().email().optional(),
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.coerce.number().int().positive().optional(),
   SMTP_USER: z.string().optional(),
@@ -41,10 +43,14 @@ export const appEnvSchema = z.object({
   BITCOIN_NETWORK: z.enum(["mainnet", "testnet", "regtest"]).default("mainnet"),
   WORKER_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(4000),
   WORKER_MAX_ATTEMPTS: z.coerce.number().int().positive().default(6),
+  CALLBACK_SECRET_ENCRYPTION_KEY: z.string().optional(),
+  CALLBACK_REQUEST_TIMEOUT_MS: z.coerce.number().int().positive().max(30_000).default(2500),
   GIT_AUTHOR_NAME: z.string().default("Hive Mind Worker"),
   GIT_AUTHOR_EMAIL: z.string().email().default("worker@hive-mind.club"),
   RAILWAY_ENVIRONMENT: z.string().optional(),
-  OTEL_EXPORTER_OTLP_ENDPOINT: z.string().optional()
+  OTEL_EXPORTER_OTLP_ENDPOINT: z.string().optional(),
+  MAPLE_OTEL_INGEST_URL: z.string().url().optional(),
+  MAPLE_API_KEY: z.string().optional()
 });
 
 export type AppEnv = z.infer<typeof appEnvSchema>;
