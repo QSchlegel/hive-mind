@@ -223,7 +223,15 @@ smoke_log "verifying ipfs payload"
 IPFS_API_URL="$IPFS_API_URL" NOTE_IPFS_CID="$NOTE_IPFS_CID" EXPECTED_NOTE_SLUG="$NOTE_SLUG" node <<'NODE'
 async function run() {
   const url = `${process.env.IPFS_API_URL}/cat?arg=${encodeURIComponent(process.env.NOTE_IPFS_CID)}`;
-  const response = await fetch(url, { method: "POST" });
+  const timeoutMs = 60 * 1000;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  let response;
+  try {
+    response = await fetch(url, { method: "POST", signal: controller.signal });
+  } finally {
+    clearTimeout(timeoutId);
+  }
   if (!response.ok) {
     throw new Error(`ipfs cat failed: ${response.status}`);
   }
@@ -255,7 +263,7 @@ run().catch((error) => {
 NODE
 
 smoke_log "verifying versions API reflects mirror metadata"
-VERSIONS_JSON=$(curl -fsS "http://127.0.0.1:3000/api/notes/${NOTE_ID}/versions")
+VERSIONS_JSON=$(curl -fsS --connect-timeout 5 --max-time 30 "http://127.0.0.1:3000/api/notes/${NOTE_ID}/versions")
 VERSIONS_JSON="$VERSIONS_JSON" EXPECTED_GIT_SHA="$NOTE_GIT_COMMIT_SHA" EXPECTED_IPFS_CID="$NOTE_IPFS_CID" node <<'NODE'
 const body = JSON.parse(process.env.VERSIONS_JSON || "");
 if (!body.ok) {
@@ -274,7 +282,7 @@ if (latest.ipfs_cid !== process.env.EXPECTED_IPFS_CID) {
 NODE
 
 smoke_log "verifying legacy wallet auth endpoints are deprecated"
-AUTH_CHALLENGE_RESPONSE=$(curl -sS "http://127.0.0.1:3000/api/auth/challenge" \
+AUTH_CHALLENGE_RESPONSE=$(curl -sS --connect-timeout 5 --max-time 30 "http://127.0.0.1:3000/api/auth/challenge" \
   -H 'content-type: application/json' \
   -d '{"wallet_address":"0x1111111111111111111111111111111111111111","chain":"evm"}' \
   -w $'\n%{http_code}')
@@ -285,7 +293,7 @@ if [ "$AUTH_CHALLENGE_STATUS" != "410" ]; then
   exit 1
 fi
 
-AUTH_VERIFY_RESPONSE=$(curl -sS "http://127.0.0.1:3000/api/auth/verify" \
+AUTH_VERIFY_RESPONSE=$(curl -sS --connect-timeout 5 --max-time 30 "http://127.0.0.1:3000/api/auth/verify" \
   -H 'content-type: application/json' \
   -d '{"message":"deprecated","signature":"deprecated"}' \
   -w $'\n%{http_code}')
@@ -416,7 +424,7 @@ TREASURY_CREATE_PAYLOAD=$(cat <<JSON
 JSON
 )
 
-TREASURY_CREATE_JSON=$(curl -fsS "http://127.0.0.1:3000/api/treasury/proposals" \
+TREASURY_CREATE_JSON=$(curl -fsS --connect-timeout 5 --max-time 30 "http://127.0.0.1:3000/api/treasury/proposals" \
   -H 'content-type: application/json' \
   -H 'origin: http://127.0.0.1:3000' \
   -H "cookie: ${TREASURY_SESSION_COOKIE}" \
@@ -446,7 +454,7 @@ TREASURY_VOTE_PAYLOAD=$(cat <<JSON
 JSON
 )
 
-TREASURY_VOTE_JSON=$(curl -fsS "http://127.0.0.1:3000/api/treasury/proposals/${TREASURY_PROPOSAL_ID}/vote" \
+TREASURY_VOTE_JSON=$(curl -fsS --connect-timeout 5 --max-time 30 "http://127.0.0.1:3000/api/treasury/proposals/${TREASURY_PROPOSAL_ID}/vote" \
   -H 'content-type: application/json' \
   -H 'origin: http://127.0.0.1:3000' \
   -H "cookie: ${TREASURY_SESSION_COOKIE}" \
@@ -485,7 +493,7 @@ run().catch((error) => {
 NODE
 
 smoke_log "finalizing proposal to approved status"
-TREASURY_FINALIZE_JSON=$(curl -fsS "http://127.0.0.1:3000/api/treasury/proposals/${TREASURY_PROPOSAL_ID}/finalize" \
+TREASURY_FINALIZE_JSON=$(curl -fsS --connect-timeout 5 --max-time 30 "http://127.0.0.1:3000/api/treasury/proposals/${TREASURY_PROPOSAL_ID}/finalize" \
   -X POST \
   -H 'origin: http://127.0.0.1:3000' \
   -H "cookie: ${TREASURY_SESSION_COOKIE}")
@@ -507,7 +515,7 @@ TREASURY_FUND_PAYLOAD=$(cat <<JSON
 JSON
 )
 
-TREASURY_FUND_JSON=$(curl -fsS "http://127.0.0.1:3000/api/treasury/proposals/${TREASURY_PROPOSAL_ID}/fund" \
+TREASURY_FUND_JSON=$(curl -fsS --connect-timeout 5 --max-time 30 "http://127.0.0.1:3000/api/treasury/proposals/${TREASURY_PROPOSAL_ID}/fund" \
   -X POST \
   -H 'content-type: application/json' \
   -H 'origin: http://127.0.0.1:3000' \
@@ -525,7 +533,7 @@ if (!(typeof body.amount_micro_eur === "number" && body.amount_micro_eur > 0)) {
 NODE
 
 smoke_log "checking admin payout listing includes funded proposal"
-TREASURY_PAYOUTS_JSON=$(curl -fsS "http://127.0.0.1:3000/api/treasury/payouts" \
+TREASURY_PAYOUTS_JSON=$(curl -fsS --connect-timeout 5 --max-time 30 "http://127.0.0.1:3000/api/treasury/payouts" \
   -H "cookie: ${TREASURY_SESSION_COOKIE}")
 
 TREASURY_PAYOUTS_JSON="$TREASURY_PAYOUTS_JSON" TREASURY_PROPOSAL_ID="$TREASURY_PROPOSAL_ID" node <<'NODE'

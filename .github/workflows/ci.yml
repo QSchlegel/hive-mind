@@ -30,6 +30,7 @@ jobs:
 
   smoke-e2e:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: ecosystem-quality
     services:
       postgres:

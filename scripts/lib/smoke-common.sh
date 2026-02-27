@@ -88,7 +88,7 @@ wait_for_http() {
   started_at="$(date +%s)"
 
   while true; do
-    if curl -fsS "$url" >/dev/null 2>&1; then
+    if curl -fsS --connect-timeout 5 --max-time 10 "$url" >/dev/null 2>&1; then
       return 0
     fi
 
